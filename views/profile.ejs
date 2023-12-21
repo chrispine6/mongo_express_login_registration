@@ -8,8 +8,21 @@
 </head>
 <body>
     <div class="container">
-        <h1>Welcome, <%= user.username %></h1>
-        <a href="/logout">Logout</a>
+        <h1>Hi there, <%= user.username %></h1>
+        <p>Followers: <%= user.followers.length %></p>
+        <p>Following: <%= user.following.length %></p>
+
+        <button id="followBtn" onclick="toggleFollow('<%= user._id %>')">Follow</button>
+        <button id="unfollowBtn" onclick="toggleFollow('<%= user._id %>')" style="display: none;">Unfollow</button>
+
+        <!-- Include necessary scripts or link to a JavaScript file -->
+        <script>
+            // Function to toggle follow/unfollow
+            function toggleFollow(userId) {
+                // Implement AJAX request to the server to follow/unfollow the user
+                // Update button states based on the server response
+            }
+        </script>
     </div>
 </body>
 </html>

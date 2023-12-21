@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= community.name %> Community</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>  
+    <div class="container">
+        <h1><%= community.name %> Community</h1>
+        <p>Description: <%= community.description %></p>
+
+        <!-- Form to add users -->
+        <div class="container">
+            <form action="/community/add-user/<%= community._id %>" method="POST">
+                <label for="userId">User ObjectID:</label>
+                <input type="text" id="userId" name="userId" required>
+                <button type="submit">Add User</button>
+            </form>
+            <!-- List of community members -->
+            <h2>Community Members</h2>
+            <ul>
+                <% community.members.forEach(member => { %>
+                    <li><%= member.username %></li>
+                <% }); %>
+            </ul>    
+        </div>
+        <!-- Link to go back to the profile page -->
+        <a href="/profile">Back to Profile</a>
+    </div>
+</body>
+</html>

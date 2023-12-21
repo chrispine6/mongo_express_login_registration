@@ -5,6 +5,7 @@ const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const path = require('path');
 const User = require('./models/User');
+const Community = require('./models/Community');
 const mongoose = require('mongoose');
 
 // Initialize the express app
@@ -29,77 +30,146 @@ db.once('open', () => {
     console.log('Connected to MongoDB');
 });
 
-
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Passport initialization
+
 passport.use(new LocalStrategy(User.authenticate()));
 passport.serializeUser(User.serializeUser());
 passport.deserializeUser(User.deserializeUser());
 
-// static file serving setup
 app.use(express.static(path.join(__dirname, 'public')));
-
-// view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
-
-// moddleware to parse the request body
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-// finally the routes
 app.get('/', (req, res) => {
     res.render('index');
 });
 
 app.get('/login', (req, res) => {
-    res.render('index');
+    res.render('login');
 });
 
 app.get('/register', (req, res) => {
     res.render('register');
 });
 
-app.get('/profile', isAuthenticated, (req, res) => {
-    res.render('profile', { user: req.user });
+
+app.get('/profile', isAuthenticated, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id).populate('communities');
+
+        if (!user) {
+            return res.status(404).send('User not found');
+        }
+
+        res.render('profile', { user });
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Error fetching user profile');
+    }
+});
+
+app.get('/create-community', isAuthenticated, (req, res) => {
+    res.render('create-community');
+});
+
+app.post('/create-community', isAuthenticated, async (req, res) => {
+    const { name, description } = req.body;
+
+    try {
+        const newCommunity = await Community.create({ name, description });
+        res.redirect(`/community/${newCommunity._id}`);
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Error creating community');
+    }
+});
+
+app.get('/community/:id', isAuthenticated, async (req, res) => {
+    const communityId = req.params.id;
+
+    try {
+        const community = await Community.findById(communityId).populate('members');
+
+        if (!community) {
+            return res.status(404).send('Community not found');
+        }
+
+        res.render('community-view', { community });
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Error fetching community');
+    }
+});
+
+app.post('/community/add-user/:id', isAuthenticated, async (req, res) => {
+    const communityId = req.params.id;
+    const userId = req.body.userId;
+
+    try {
+        const community = await Community.findById(communityId);
+
+        if (!community) {
+            return res.status(404).send('Community not found');
+        }
+
+        if (community.members.includes(userId)) {
+            return res.status(400).send('User is already a member of this community');
+        }
+
+        community.members.push(userId);
+        await community.save();
+
+        res.redirect(`/community/${community._id}`);
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Error adding user to community');
+    }
 });
 
 app.post('/login', passport.authenticate('local', {
-    successRedirect: '/profile',
+    successRedirect: '/posts',
     failureRedirect: '/login'
 }));
 
-app.post('/register', (req, res) => {
-   console.log(req.body); 
-   if (!req.body.username || !req.body.password) {
-       return res.status(400).send('Username and password are required');
-   }
-
-   const newUser = new User({ username: req.body.username });
-   
-   // set password using setPassword method provided by passport-local-mongoose
-   newUser.setPassword(req.body.password, (err) => {
-       if (err) {
-           console.error(err);
-           return res.status(500).send('Error setting password');
-       }
-
-       // finally save user to db
-       newUser.save()
-           .then((savedUser) => {
-               // registration success
-               res.redirect('/login'); // redirect user back to login page
-           })
-           .catch((saveErr) => {
-               console.error(saveErr);
-               return res.status(500).send('Error saving user');
-           });
-   });
+app.get('/profile', isAuthenticated, async (req, res) => {
+    // Your existing profile route logic
+    res.render('profile', { user });
 });
 
+app.get('/posts', isAuthenticated, (req, res) => {
+    res.render('pages/posts', { user: req.user });
+});
 
+app.get('/messages', isAuthenticated, (req, res) => {
+    res.render('pages/messages', { user: req.user });
+});
+
+app.get('/calendar', isAuthenticated, (req, res) => {
+    res.render('pages/calendar', { user: req.user });
+});
+
+app.post('/register', (req, res) => {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).send('Username and password are required');
+    }
+
+    User.register(new User({ username }), password, (err, user) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).send('Error registering user');
+        }
+
+        passport.authenticate('local')(req, res, () => {
+            res.redirect('/login');
+        });
+    });
+});
 
 app.get('/logout', (req, res) => {
     req.logout((err) => {
@@ -109,14 +179,14 @@ app.get('/logout', (req, res) => {
         res.redirect('/');
     });
 });
+
 function isAuthenticated(req, res, next) {
     if (req.isAuthenticated()) {
         return next();
     }
-    res.redirect('/login');
+    res.status(401).send('Unauthorized access. Please log in.');
 }
 
-// listener function
 app.listen(3000, () => {
     console.log('Server is running on http://localhost:3000');
 });
